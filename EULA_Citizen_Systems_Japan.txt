@@ -1,0 +1,22 @@
+This End User License Agreement ("EULA") is a legal agreement between you and CITIZEN SYSTEMS JAPAN CO., LTD. ("CSJ") and governs your use of this Software Development Kit (SOFTWARE). Your use of the SOFTWARE is deemed to be your acceptance of the Terms and Conditions of this EULA set out below.
+You only may use the SOFTWARE if you agree to abide by the following Terms and Conditions. If you decline to agree, you are not authorized to use the SOFTWARE.
+
+1. Ownership
+All rights, titles and interest in and to the SOFTWARE, its copy and the documents associated therewith are owned by CSJ or such party which is authorized by CSJ the ownership of the rights, titles and interest in the relevant part of the SOFTWARE. These rights to the SOFTWARE are licensed to you as prescribed in the Article 2. In no event should it be construed as an expression to assign or sell any copyrights of or any other intellectual property rights to the SOFTWARE from CSJ to you.
+
+2. Grant of License
+2.1 CSJ grants you a non-exclusive, non-transferable license to use the SOFTWARE.
+2.2 Except for expressly stipulated in Sections 2.1 above, no license relating to the SOFTWARE is granted. You may not, (i) make any copies of the SOFTWARE, (ii) modify the SOFTWARE, (iii) reverse engineer, disassemble, decompile or use the SOFTWARE to create any derivative software, (iv) rent, lease or sublicense the SOFTWARE in all or in part, (v) distribute or make available the SOFTWARE to the public in all or in part, or (vi) use, remove or alter any notices, marks or labels relating to trade names, trademarks, copyrights or other intellectual property rights presented or displayed in or by the SOFTWARE.
+2.3 CSJ may at its discretion modify or update the SOFTWARE.
+
+3. Disclaimer of Warranties
+TO THE EXTENT ALLOWED BY LAW, THIS SOFTWARE IS PROVIDED TO YOU "AS IS" WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, WHETHER ORAL OR WRITTEN, EXPRESS OR IMPLIED. CSJ SPECIFICALLY DISCLAIMS ANY IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, SATISFACTORY QUALITY, NON-INFRINGEMENT AND/OR FITNESS FOR A PARTICULAR PURPOSE.
+
+4. Disclaimer of Liability
+IN NO EVENT SHALL CSJ BE LIABLE FOR ANY LOSS OF PROFITS, LOSS OF BUSINESS OPPORTUNITIES, LOSS OF USE OF DATA, INTERRUPTION OF BUSINESS, OR FOR INDIRECT, SPECIAL, INCIDENTAL, PUNITIVE, EXEMPLARY OR CONSEQUENTIAL DAMAGES OF ANY KIND, ARISING OUT OF THE USE, INABILITY TO USE, OR THE RESULTS OF USE OF THE SOFTWARE, WHETHER BASED IN CONTRACT, TORT, OR OTHERWISE. YOUR USE OF THE SOFTWARE IS ENTIRELY AT YOUR OWN RISK. SHOULD THE SOFTWARE PROVE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL SERVICE, REPAIR OR CORRECTION AND, TO THE EXTENT PERMITTED BY THE APPLICABLE LAW, YOU AGREE TO UNCONDITIONALLY WAIVE ALL STATUTORY OR OTHER RIGHTS THAT MAY BE HELD BY YOU AGAINST CSJ IN RESPECT OF SUCH DEFECT. Notwithstanding the above, these terms do not purport to limit the statutory rights of a consumer that cannot be waived under the applicable law.
+
+5. Term
+This EULA will become effective upon your acceptance and continue in effect unless you cease to use the SOFTWARE. However, CSJ retains the right to terminate this EULA without cause or notice.
+
+6. Governing Law
+This EULA is governed by and construed in accordance with the laws of Japan. If any of the provisions of this EULA shall be declared void, such provisions shall be severable and independent from the other provisions of this EULA, and the validity of the other provisions and of the entire EULA shall not be affected.

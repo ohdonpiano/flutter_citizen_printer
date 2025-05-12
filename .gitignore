@@ -1,0 +1,41 @@
+# Android artifacts
+/android/build/
+/android/.gradle/
+/android/gradle/wrapper/gradle-wrapper.jar
+
+# iOS artifacts
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Podfile.lock
+/ios/Pods/
+
+# Gradle files
+/gradlew
+/gradlew.bat
+
+# IntelliJ related files
+/.idea/
+*.iml
+
+# VSCode related files
+.vscode/
+
+# Build files
+/build/
+/dist/
+/out/
+/release/
+
+# Dart and Flutter related files
+.dart_tool/
+.packages
+*.g.dart
+*.freezed.dart
+
+# Crash reports
+crashlytics/
+
+# Miscellaneous
+*.log
+*.tmp
+tmp/

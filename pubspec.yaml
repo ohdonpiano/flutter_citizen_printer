@@ -1,0 +1,17 @@
+name: flutter_citizen_printer
+description: Flutter plugin for Citizen label printer via USB and WiFi.
+version: 0.0.1
+repository: https://github.com/ohdonpiano/flutter_citizen_printer
+issue_tracker: https://github.com/ohdonpiano/flutter_citizen_printer/issues
+environment:
+  sdk: ">=3.2.6"
+  flutter: ">=2.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.ohdonpiano.flutter_citizen_printer
+        pluginClass: FlutterCitizenPrinterPlugin
