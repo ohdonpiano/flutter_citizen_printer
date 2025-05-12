@@ -4,7 +4,7 @@ version: 0.0.1
 repository: https://github.com/ohdonpiano/flutter_citizen_printer
 issue_tracker: https://github.com/ohdonpiano/flutter_citizen_printer/issues
 environment:
-  sdk: ">=3.2.6"
+  sdk: '>=3.2.6 <4.0.0'
   flutter: ">=2.0.0"
 dependencies:
   flutter:
