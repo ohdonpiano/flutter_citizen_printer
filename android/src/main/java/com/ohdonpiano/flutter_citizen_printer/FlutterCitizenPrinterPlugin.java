@@ -59,6 +59,17 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             } else {
                 result.error("DETECT_ERROR", CitizenPrinterErrorCodes.errorMessage(err[0]), null);
             }
+        } else if (call.method.equals("getUsbStatus")) {
+            LabelPrinter printer = new LabelPrinter();
+            printer.setContext(context);
+            int r = printer.connect(LabelConst.CLS_PORT_USB, (UsbDevice) null);
+            if (r != LabelConst.CLS_SUCCESS) {
+                result.error("CONNECT_ERROR", "Code: " + r, null);
+                return;
+            }
+            int res = printer.printerCheck();
+            printer.disconnect();
+            result.success(res);
         } else {
             result.notImplemented();
         }
