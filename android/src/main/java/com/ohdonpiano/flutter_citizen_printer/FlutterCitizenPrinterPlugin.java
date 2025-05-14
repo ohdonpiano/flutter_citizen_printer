@@ -86,7 +86,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
             fos.write(imageBytes);
             fos.close();
-            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, 0, 0, 0, 0);
+            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, 0, 0, 0, 0, LabelConst.CLS_PRT_RES_300, LabelConst.CLS_UNIT_MILLI);
             r = printer.print(design, 1);
         } catch (Exception e) {
             return -1;
