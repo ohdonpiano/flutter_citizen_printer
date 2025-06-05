@@ -16,7 +16,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String selectedAddress = "192.168.0.100";
+  final addressController = TextEditingController();
+  String usbStatus = "";
 
   @override
   Widget build(BuildContext context) {
@@ -25,73 +26,103 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(title: const Text('Citizen Printer Example')),
         body: Builder(builder: (context) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      final ips = await FlutterCitizenPrinter.detectPrinters();
-                      log("detected ips: $ips");
-                      if (context.mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: Text('Found printers'),
-                            content: ListView.builder(
-                              itemCount: ips.length,
-                              itemBuilder: (context, index) {
-                                return ListTile(
-                                  title: Text(ips[index]),
-                                  onTap: () {
-                                    setState(() {
-                                      selectedAddress = ips[index];
-                                    });
-                                    Navigator.pop(context);
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(usbStatus),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          final res =
+                              await FlutterCitizenPrinter.getUsbStatus();
+                          log("USB Status: $res");
+                          setState(() {
+                            usbStatus = res.map((e) => e.name).join(", ");
+                          });
+                        } catch (e) {
+                          log("USB Status error: $e");
+                          if (!mounted) return;
+                          setState(() {
+                            usbStatus = "Error: $e";
+                          });
+                        }
+                      },
+                      child: const Text('Get USB Status'),
+                    ),
+                    TextFormField(
+                      controller: addressController,
+                      decoration: InputDecoration(labelText: "IP Address"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          final ips =
+                              await FlutterCitizenPrinter.detectPrinters();
+                          log("detected ips: $ips");
+                          if (context.mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: Text('Found printers'),
+                                content: ListView.builder(
+                                  itemCount: ips.length,
+                                  itemBuilder: (context, index) {
+                                    return ListTile(
+                                      title: Text(ips[index]),
+                                      onTap: () {
+                                        setState(() {
+                                          addressController.text = ips[index];
+                                        });
+                                        Navigator.pop(context);
+                                      },
+                                    );
                                   },
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      }
-                    } on PlatformException catch (e) {
-                      log("Error: $e");
-                      // show a snackbar with the error
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(e.message ??
-                                "Unknown error while detecting printers"),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: Text('Detect Printer'),
+                                ),
+                              ),
+                            );
+                          }
+                        } on PlatformException catch (e) {
+                          log("Error: $e");
+                          // show a snackbar with the error
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(e.message ??
+                                    "Unknown error while detecting printers"),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Text('Detect Printer'),
+                    ),
+                    Divider(),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final ByteData data =
+                            await rootBundle.load('assets/sample.bmp');
+                        final Uint8List bytes = data.buffer.asUint8List();
+                        await FlutterCitizenPrinter.printImageUSB(bytes);
+                      },
+                      child: const Text('Print via USB'),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final ByteData data =
+                            await rootBundle.load('assets/sample.bmp');
+                        final Uint8List bytes = data.buffer.asUint8List();
+                        await FlutterCitizenPrinter.printImageWiFi(
+                            addressController.text, bytes);
+                      },
+                      child: const Text('Print via WiFi'),
+                    ),
+                  ],
                 ),
-                Divider(),
-                ElevatedButton(
-                  onPressed: () async {
-                    final ByteData data =
-                        await rootBundle.load('assets/sample.bmp');
-                    final Uint8List bytes = data.buffer.asUint8List();
-                    await FlutterCitizenPrinter.printImageUSB(bytes);
-                  },
-                  child: const Text('Print via USB'),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    final ByteData data =
-                        await rootBundle.load('assets/sample.bmp');
-                    final Uint8List bytes = data.buffer.asUint8List();
-                    await FlutterCitizenPrinter.printImageWiFi(
-                        selectedAddress, bytes);
-                  },
-                  child: const Text('Print via WiFi'),
-                ),
-              ],
+              ),
             ),
           );
         }),
