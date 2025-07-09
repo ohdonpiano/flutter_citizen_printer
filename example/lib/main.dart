@@ -71,10 +71,11 @@ class _MyAppState extends State<MyApp> {
                                   itemCount: ips.length,
                                   itemBuilder: (context, index) {
                                     return ListTile(
-                                      title: Text(ips[index]),
+                                      title: Text(ips[index].ipAddress),
                                       onTap: () {
                                         setState(() {
-                                          addressController.text = ips[index];
+                                          addressController.text =
+                                              ips[index].ipAddress;
                                         });
                                         Navigator.pop(context);
                                       },

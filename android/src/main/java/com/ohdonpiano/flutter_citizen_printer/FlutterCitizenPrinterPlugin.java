@@ -15,6 +15,9 @@ import com.citizen.sdk.labelprint.LabelDesign;
 import com.citizen.sdk.labelprint.CitizenPrinterInfo;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel.MethodCallHandler {
     private MethodChannel channel;
@@ -32,7 +35,9 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         if (call.method.equals("printImageWiFi")) {
             String ip = call.argument("ip");
             byte[] bytes = call.argument("imageBytes");
-            int res = printImageWiFi(ip, bytes);
+            int width = call.argument("width");
+            int height = call.argument("height");
+            int res = printImageWiFi(ip, bytes, width, height);
             if (res == LabelConst.CLS_SUCCESS) result.success(null);
             else result.error("PRINT_ERROR", CitizenPrinterErrorCodes.errorMessage(res), null);
         } else if (call.method.equals("printImageUSB")) {
@@ -51,11 +56,29 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
                     err
             );
             if (err[0] == LabelConst.CLS_SUCCESS) {
-                ArrayList<String> ips = new ArrayList<>();
+                ArrayList<Map<String, String>> ips = new ArrayList<>();
                 for (CitizenPrinterInfo info : list) {
-                    ips.add(info.ipAddress);
+                    HashMap<String, String> data = new HashMap<>();
+                    data.put("ipAddress", info.ipAddress);
+                    data.put("deviceName", info.deviceName);
+                    ips.add(data);
                 }
                 result.success(ips);
+            } else {
+                result.error("DETECT_ERROR", CitizenPrinterErrorCodes.errorMessage(err[0]), null);
+            }
+        } else if (call.method.equals("searchLabelPrinter")) {
+            int timeout = call.argument("timeout");
+            int[] err = new int[1];
+            LabelPrinter printer = new LabelPrinter();
+            printer.setContext(context);
+            String[] list = printer.searchLabelPrinter(
+                    LabelConst.CLS_PORT_WiFi,
+                    timeout,
+                    err
+            );
+            if (err[0] == LabelConst.CLS_SUCCESS) {
+                result.success(list);
             } else {
                 result.error("DETECT_ERROR", CitizenPrinterErrorCodes.errorMessage(err[0]), null);
             }
@@ -75,18 +98,18 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         }
     }
 
-    private int printImageWiFi(String ip, byte[] imageBytes) {
+    private int printImageWiFi(String ip, byte[] imageBytes, int width, int height) {
         LabelPrinter printer = new LabelPrinter();
         printer.setContext(context);
         int r = printer.connect(LabelConst.CLS_PORT_WiFi, ip);
         if (r != LabelConst.CLS_SUCCESS) return r;
         LabelDesign design = new LabelDesign();
         try {
-            java.io.File file = new java.io.File(context.getCacheDir(), "print.bmp");
+            java.io.File file = new java.io.File(context.getCacheDir(), "print.png");
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
             fos.write(imageBytes);
             fos.close();
-            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, 0, 0, 0, 0, LabelConst.CLS_PRT_RES_300, LabelConst.CLS_UNIT_MILLI);
+            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, width, height, 0, 0, LabelConst.CLS_PRT_RES_300, LabelConst.CLS_UNIT_MILLI);
             r = printer.print(design, 1);
         } catch (Exception e) {
             return -1;
@@ -107,7 +130,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
             fos.write(imageBytes);
             fos.close();
-            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, 0, 236, 0, 0, LabelConst.CLS_PRT_RES_300, LabelConst.CLS_UNIT_MILLI);
+            design.drawBitmap(file.getAbsolutePath(), LabelConst.CLS_RT_NORMAL, 0, 0, 0, 0, LabelConst.CLS_PRT_RES_300, LabelConst.CLS_UNIT_MILLI);
             r = printer.print(design, 1);
         } catch (Exception e) {
             return -1;
