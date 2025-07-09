@@ -126,7 +126,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         if (r != LabelConst.CLS_SUCCESS) return r;
         LabelDesign design = new LabelDesign();
         try {
-            java.io.File file = new java.io.File(context.getCacheDir(), "print.bmp");
+            java.io.File file = new java.io.File(context.getCacheDir(), "print.png");
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
             fos.write(imageBytes);
             fos.close();
