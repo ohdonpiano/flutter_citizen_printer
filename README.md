@@ -13,7 +13,7 @@ Flutter plugin for Citizen label printers via USB and WiFi.
 Add to your `pubspec.yaml`:
 ```yaml
 dependencies:
-  flutter_citizen_printer: ^0.0.1    
+  flutter_citizen_printer: ^0.0.3    
 ```
 
 ### Android Native Library
@@ -28,10 +28,40 @@ Import the plugin:
 import 'package:flutter_citizen_printer/flutter_citizen_printer.dart';
 ```
 
-### Print via USB
+### Print via USB (single printer)
 ```dart
 final bytes = (await rootBundle.load('assets/sample.bmp')).buffer.asUint8List();
 await FlutterCitizenPrinter.printImageUSB(bytes);
+```
+
+### Multiple USB Printers Support (NEW in v0.0.3)
+
+#### Search for USB printers
+```dart
+List<UsbPrinterInfo> printers = await FlutterCitizenPrinter.searchUsbPrinters();
+print('Found ${printers.length} USB printers');
+
+for (UsbPrinterInfo printer in printers) {
+  print('Printer: ${printer.displayName}');
+  print('Device ID: ${printer.deviceId}');
+  print('Manufacturer: ${printer.manufacturerName}');
+  print('Product: ${printer.productName}');
+  print('Vendor ID: ${printer.vendorId}');
+  print('Product ID: ${printer.productId}');
+}
+```
+
+#### Print to specific USB printer
+```dart
+// Select a specific printer from the list
+UsbPrinterInfo selectedPrinter = printers[0]; // or from user selection
+
+// Print to the selected printer
+final bytes = (await rootBundle.load('assets/sample.bmp')).buffer.asUint8List();
+await FlutterCitizenPrinter.printImageUsbSpecific(
+  selectedPrinter.deviceId,
+  bytes,
+);
 ```
 
 ### Print via WiFi
@@ -40,19 +70,76 @@ final bytes = (await rootBundle.load('assets/sample.bmp')).buffer.asUint8List();
 await FlutterCitizenPrinter.printImageWiFi(
   '192.168.0.100', // printer IP
   bytes,
+  width, // image width
+  height, // image height
 );
 ```
 
 ### Discover printers on LAN
 ```dart
-final ips = await FlutterCitizenPrinter.detectPrinters(3); // 3 seconds timeout
+final ips = await FlutterCitizenPrinter.detectPrinters(timeout: 3); // 3 seconds timeout
 print('Detected printers: $ips');
 ```
 
-## EULA
+### Check USB printer status
+```dart
+final status = await FlutterCitizenPrinter.getUsbStatus();
+print('USB Status: ${status.map((e) => e.name).join(", ")}');
+```
 
-The native library `CSJLabelLib_Android.jar` is subject to the EULA from Citizen Systems Japan (see `EULA_Citizen_Systems_Japan.txt`). You must accept the terms before using it.
+## API Reference
+
+### Classes
+
+#### UsbPrinterInfo
+Represents information about a USB printer:
+- `deviceId`: Unique identifier for the printer
+- `deviceName`: System device name
+- `manufacturerName`: Manufacturer name
+- `productName`: Product name
+- `vendorId`: USB vendor ID
+- `productId`: USB product ID
+- `displayName`: User-friendly display name
+
+### Methods
+
+#### searchUsbPrinters()
+Returns a list of all connected USB printers as `List<UsbPrinterInfo>`.
+
+#### printImageUsbSpecific(String deviceId, Uint8List imageBytes)
+Prints an image to a specific USB printer identified by its device ID.
+
+#### printImageUSB(Uint8List imageBytes)
+Prints an image to the first available USB printer (legacy method).
+
+#### printImageWiFi(String ip, Uint8List imageBytes, int width, int height)
+Prints an image to a WiFi printer at the specified IP address.
+
+#### detectPrinters({int timeout = 3})
+Discovers Citizen printers on the local network via WiFi.
+
+#### getUsbStatus()
+Gets the status of the USB printer connection.
 
 ## Example
 
-See the `example/` folder for a complete app demonstrating printing via USB, WiFi, and printer discovery.
+See the complete example in the `/example` folder which demonstrates:
+- Searching for multiple USB printers
+- Selecting a specific printer from a list
+- Printing to the selected printer
+- WiFi printer discovery and printing
+
+## Changelog
+
+### Version 0.0.3
+- **Multiple USB printers support**: Added ability to manage and print to multiple USB printers simultaneously
+- New `searchUsbPrinters()` method to find all connected USB printers
+- New `printImageUsbSpecific()` method to print to a specific printer
+- Added `UsbPrinterInfo` class for printer information
+- Enhanced example app with printer selection UI
+
+### Version 0.0.2
+- Bug fixes and improvements
+
+### Version 0.0.1
+- Initial release with basic USB and WiFi printing support
