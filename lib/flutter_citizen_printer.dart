@@ -16,6 +16,46 @@ class CitizenPrinterDetails {
   }
 }
 
+class UsbPrinterInfo {
+  final String deviceId;
+  final String deviceName;
+  final String manufacturerName;
+  final String productName;
+  final int vendorId;
+  final int productId;
+
+  UsbPrinterInfo({
+    required this.deviceId,
+    required this.deviceName,
+    required this.manufacturerName,
+    required this.productName,
+    required this.vendorId,
+    required this.productId,
+  });
+
+  factory UsbPrinterInfo.fromMap(Map<String, dynamic> map) {
+    return UsbPrinterInfo(
+      deviceId: map['deviceId'] as String,
+      deviceName: map['deviceName'] as String,
+      manufacturerName: map['manufacturerName'] as String,
+      productName: map['productName'] as String,
+      vendorId: map['vendorId'] as int,
+      productId: map['productId'] as int,
+    );
+  }
+
+  String get displayName {
+    if (manufacturerName.isNotEmpty && productName.isNotEmpty) {
+      return '$manufacturerName $productName';
+    } else if (productName.isNotEmpty) {
+      return productName;
+    } else if (manufacturerName.isNotEmpty) {
+      return manufacturerName;
+    }
+    return deviceName;
+  }
+}
+
 class FlutterCitizenPrinter {
   static const MethodChannel _channel =
       MethodChannel('flutter_citizen_printer');
@@ -54,5 +94,17 @@ class FlutterCitizenPrinter {
 
   static Future<void> printImageUSB(Uint8List imageBytes) async {
     await _channel.invokeMethod('printImageUSB', {'imageBytes': imageBytes});
+  }
+
+  static Future<List<UsbPrinterInfo>> searchUsbPrinters() async {
+    final List<dynamic> devices = await _channel.invokeMethod('searchUsbPrinters');
+    return devices.map((e) => UsbPrinterInfo.fromMap(e as Map<String, dynamic>)).toList();
+  }
+
+  static Future<void> printImageUsbSpecific(String deviceId, Uint8List imageBytes) async {
+    await _channel.invokeMethod('printImageUsbSpecific', {
+      'deviceId': deviceId,
+      'imageBytes': imageBytes,
+    });
   }
 }

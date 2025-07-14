@@ -18,6 +18,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final addressController = TextEditingController();
   String usbStatus = "";
+  List<UsbPrinterInfo> usbPrinters = [];
+  UsbPrinterInfo? selectedPrinter;
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +52,94 @@ class _MyAppState extends State<MyApp> {
                           });
                         }
                       },
-                      child: const Text('Get USB Status'),
+                      child: const Text("Get USB Status"),
                     ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          final printers =
+                              await FlutterCitizenPrinter.searchUsbPrinters();
+                          log("Found ${printers.length} USB printers");
+                          setState(() {
+                            usbPrinters = printers;
+                            selectedPrinter =
+                                printers.isNotEmpty ? printers.first : null;
+                          });
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Trovate ${printers.length} stampanti USB')),
+                          );
+                        } catch (e) {
+                          log("Search USB printers error: $e");
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Errore ricerca stampanti: $e')),
+                          );
+                        }
+                      },
+                      child: const Text("Cerca stampanti USB"),
+                    ),
+                    const SizedBox(height: 20),
+                    if (usbPrinters.isNotEmpty) ...[
+                      const Text("Stampanti USB trovate:"),
+                      const SizedBox(height: 10),
+                      ...usbPrinters.map((printer) => Card(
+                            child: ListTile(
+                              title: Text(printer.displayName),
+                              subtitle: Text(
+                                  'ID: ${printer.deviceId}\nVendor: ${printer.vendorId}, Product: ${printer.productId}'),
+                              leading: Radio<UsbPrinterInfo>(
+                                value: printer,
+                                groupValue: selectedPrinter,
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedPrinter = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          )),
+                      const SizedBox(height: 20),
+                    ],
+                    if (selectedPrinter != null) ...[
+                      Text(
+                          'Stampante selezionata: ${selectedPrinter!.displayName}'),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            // Carica un'immagine di esempio (dovrai fornire l'immagine)
+                            final ByteData data =
+                                await rootBundle.load('assets/sample.bmp');
+                            final Uint8List imageBytes =
+                                data.buffer.asUint8List();
+
+                            await FlutterCitizenPrinter.printImageUsbSpecific(
+                              selectedPrinter!.deviceId,
+                              imageBytes,
+                            );
+
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Stampa inviata con successo!')),
+                            );
+                          } catch (e) {
+                            log("Print error: $e");
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Errore stampa: $e')),
+                            );
+                          }
+                        },
+                        child: const Text("Stampa su stampante selezionata"),
+                      ),
+                    ],
                     TextFormField(
                       controller: addressController,
                       decoration: InputDecoration(labelText: "IP Address"),
@@ -117,7 +205,7 @@ class _MyAppState extends State<MyApp> {
                             await rootBundle.load('assets/sample.bmp');
                         final Uint8List bytes = data.buffer.asUint8List();
                         await FlutterCitizenPrinter.printImageWiFi(
-                            addressController.text, bytes);
+                            addressController.text, bytes, 0, 0);
                       },
                       child: const Text('Print via WiFi'),
                     ),
