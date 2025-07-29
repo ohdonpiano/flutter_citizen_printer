@@ -1,3 +1,7 @@
+## 0.0.4
+
+*   **Correzione di bug**: Risolto problema di cast nel metodo `searchUsbPrinters()` che causava l'errore `type '_Map<Object?, Object?>' is not a subtype of type 'Map<String, dynamic>' in type cast`
+
 ## 0.0.3
 
 *   **Multiple USB printers support**: Added ability to manage and print to multiple USB printers simultaneously.

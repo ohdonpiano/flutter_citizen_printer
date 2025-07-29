@@ -1,5 +1,14 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.flutter_citizen_printer">
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permesso per gestire dispositivi USB -->
+    <uses-permission android:name="android.permission.MANAGE_USB" />
+
+    <!-- Permesso per accedere ai dispositivi USB -->
     <uses-permission android:name="android.permission.USB_PERMISSION" />
+
+    <!-- Feature USB per dichiarare che l'app supporta dispositivi USB -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+
 </manifest>
