@@ -19,6 +19,7 @@ import com.citizen.sdk.labelprint.LabelConst;
 import com.citizen.sdk.labelprint.LabelDesign;
 import com.citizen.sdk.labelprint.CitizenPrinterInfo;
 
+import java.util.Collection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -406,23 +407,24 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         usbDeviceMap.clear();
 
         // Collect all USB devices
-        for (UsbDevice device : usbManager.getDeviceList().values()) {
+        Collection<UsbDevice> usbDeviceList = usbManager.getDeviceList().values();
+        System.out.println("Total USB devices found: " + usbDeviceList);
+        for (UsbDevice device : usbDeviceList) {
             String deviceKey = String.valueOf(device.getDeviceId());
             usbDeviceMap.put(deviceKey, device);
             UsbPrinterInfo printerInfo = new UsbPrinterInfo(device);
-            currentSearchPrinters.add(printerInfo);
 
             // Filter only CITIZEN devices for serial number reading
             String manufacturerName = device.getManufacturerName();
             if (manufacturerName != null && manufacturerName.toUpperCase().contains("CITIZEN")) {
                 citizenDevicesQueue.add(device);
+                currentSearchPrinters.add(printerInfo);
                 System.out.println("Found CITIZEN device: " + printerInfo.toString());
             } else {
                 System.out.println("Found non-CITIZEN device: " + printerInfo.toString());
             }
         }
 
-        System.out.println("Total USB devices found: " + currentSearchPrinters.size());
         System.out.println("CITIZEN devices to process: " + citizenDevicesQueue.size());
 
         // If there are no CITIZEN devices, return results immediately
