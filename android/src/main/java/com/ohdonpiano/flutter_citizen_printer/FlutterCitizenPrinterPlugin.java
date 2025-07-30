@@ -29,7 +29,6 @@ class UsbPrinterInfo {
     public String deviceName;
     public String manufacturerName;
     public String productName;
-    public String serialNumber;
     public int vendorId;
     public int productId;
     public UsbDevice usbDevice;
@@ -40,7 +39,6 @@ class UsbPrinterInfo {
         this.deviceName = device.getDeviceName();
         this.manufacturerName = device.getManufacturerName() != null ? device.getManufacturerName() : "";
         this.productName = device.getProductName() != null ? device.getProductName() : "";
-        this.serialNumber = device.getSerialNumber() != null ? device.getSerialNumber() : "";
         this.vendorId = device.getVendorId();
         this.productId = device.getProductId();
     }
@@ -51,10 +49,20 @@ class UsbPrinterInfo {
         map.put("deviceName", deviceName);
         map.put("manufacturerName", manufacturerName);
         map.put("productName", productName);
-        map.put("serialNumber", serialNumber);
         map.put("vendorId", vendorId);
         map.put("productId", productId);
         return map;
+    }
+
+    public String toString() {
+        return "UsbPrinterInfo{" +
+                "deviceId='" + deviceId + '\'' +
+                ", deviceName='" + deviceName + '\'' +
+                ", manufacturerName='" + manufacturerName + '\'' +
+                ", productName='" + productName + '\'' +
+                ", vendorId=" + vendorId +
+                ", productId=" + productId +
+                '}';
     }
 }
 
@@ -198,6 +206,10 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         } else if (call.method.equals("searchUsbPrinters")) {
             try {
                 ArrayList<Map<String, Object>> printers = searchUsbPrinters();
+                System.out.println("Found USB Printers: ");
+                for (Map<String, Object> printer : printers) {
+                    System.out.println("- " + printer);
+                }
                 result.success(printers);
             } catch (Exception e) {
                 result.error("USB_SEARCH_ERROR", e.getMessage(), null);
@@ -227,7 +239,10 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             r = -1;
         } finally {
             if (fos != null) {
-                try { fos.close(); } catch (Exception ignored) {}
+                try {
+                    fos.close();
+                } catch (Exception ignored) {
+                }
             }
             if (file != null && file.exists()) {
                 file.delete();
@@ -257,7 +272,10 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             r = -1;
         } finally {
             if (fos != null) {
-                try { fos.close(); } catch (Exception ignored) {}
+                try {
+                    fos.close();
+                } catch (Exception ignored) {
+                }
             }
             if (file != null && file.exists()) {
                 file.delete();
@@ -339,7 +357,10 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             r = -1;
         } finally {
             if (fos != null) {
-                try { fos.close(); } catch (Exception ignored) {}
+                try {
+                    fos.close();
+                } catch (Exception ignored) {
+                }
             }
             if (file != null && file.exists()) {
                 file.delete();
