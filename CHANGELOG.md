@@ -1,6 +1,23 @@
+## 0.0.5
+
+*   **Enhanced USB Serial Number Support**: Added asynchronous serial number reading for CITIZEN USB printers with optimized permission handling
+*   **New features**:
+    *   Asynchronous serial number retrieval for CITIZEN devices only (optimized to avoid unnecessary permission requests)
+    *   Sequential permission handling to prevent conflicts between multiple USB device access requests
+    *   Enhanced `UsbPrinterInfo` class with `serialNumber` field populated for CITIZEN devices
+    *   Improved error handling and logging for USB device management
+*   **Performance optimizations**:
+    *   Smart filtering: only requests permissions for devices with "CITIZEN" manufacturer name
+    *   Non-blocking USB search process that handles permission dialogs gracefully
+    *   Prevention of concurrent search operations to avoid conflicts
+*   **Technical improvements**:
+    *   All code comments translated to English for consistency
+    *   Enhanced BroadcastReceiver for handling both print and serial number permissions
+    *   Better state management for asynchronous operations
+
 ## 0.0.4
 
-*   **Correzione di bug**: Risolto problema di cast nel metodo `searchUsbPrinters()` che causava l'errore `type '_Map<Object?, Object?>' is not a subtype of type 'Map<String, dynamic>' in type cast`
+*   **Bug fix**: Fixed cast issue in `searchUsbPrinters()` method that caused `type '_Map<Object?, Object?>' is not a subtype of type 'Map<String, dynamic>' in type cast` error
 
 ## 0.0.3
 

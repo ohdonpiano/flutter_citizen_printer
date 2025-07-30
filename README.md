@@ -13,7 +13,7 @@ Flutter plugin for Citizen label printers via USB and WiFi.
 Add to your `pubspec.yaml`:
 ```yaml
 dependencies:
-  flutter_citizen_printer: ^0.0.3    
+  flutter_citizen_printer: ^0.0.5    
 ```
 
 ### Android Native Library
@@ -34,9 +34,9 @@ final bytes = (await rootBundle.load('assets/sample.bmp')).buffer.asUint8List();
 await FlutterCitizenPrinter.printImageUSB(bytes);
 ```
 
-### Multiple USB Printers Support (NEW in v0.0.3)
+### Multiple USB Printers Support (Enhanced in v0.0.5)
 
-#### Search for USB printers
+#### Search for USB printers with serial numbers
 ```dart
 List<UsbPrinterInfo> printers = await FlutterCitizenPrinter.searchUsbPrinters();
 print('Found ${printers.length} USB printers');
@@ -48,8 +48,11 @@ for (UsbPrinterInfo printer in printers) {
   print('Product: ${printer.productName}');
   print('Vendor ID: ${printer.vendorId}');
   print('Product ID: ${printer.productId}');
+  print('Serial Number: ${printer.serialNumber}'); // NEW in v0.0.5 - populated for CITIZEN devices
 }
 ```
+
+**Note on Serial Numbers**: Serial numbers are automatically retrieved for CITIZEN devices only. The plugin intelligently requests USB permissions only for CITIZEN branded devices to optimize the user experience and avoid unnecessary permission dialogs for non-CITIZEN USB devices.
 
 #### Print to specific USB printer
 ```dart
@@ -99,12 +102,20 @@ Represents information about a USB printer:
 - `productName`: Product name
 - `vendorId`: USB vendor ID
 - `productId`: USB product ID
+- `serialNumber`: Device serial number (populated for CITIZEN devices) **NEW in v0.0.5**
 - `displayName`: User-friendly display name
 
 ### Methods
 
 #### searchUsbPrinters()
-Returns a list of all connected USB printers as `List<UsbPrinterInfo>`.
+Returns a list of all connected USB printers as `List<UsbPrinterInfo>`. 
+
+**Enhanced in v0.0.5**: Now includes serial number reading for CITIZEN devices with optimized permission handling. The method:
+- Scans all USB devices
+- Identifies CITIZEN devices by manufacturer name
+- Asynchronously requests permissions only for CITIZEN devices
+- Populates serial numbers for devices where permission is granted
+- Returns complete device information including serial numbers
 
 #### printImageUsbSpecific(String deviceId, Uint8List imageBytes)
 Prints an image to a specific USB printer identified by its device ID.
@@ -124,12 +135,29 @@ Gets the status of the USB printer connection.
 ## Example
 
 See the complete example in the `/example` folder which demonstrates:
-- Searching for multiple USB printers
+- Searching for multiple USB printers with serial number support
 - Selecting a specific printer from a list
 - Printing to the selected printer
 - WiFi printer discovery and printing
 
+## Performance & Optimization
+
+**Version 0.0.5** introduces several performance optimizations:
+
+- **Smart Permission Requests**: Only requests USB permissions for CITIZEN branded devices, reducing unnecessary user prompts
+- **Asynchronous Processing**: Serial number reading is handled asynchronously to prevent UI blocking
+- **Sequential Permission Handling**: Processes one device at a time to avoid permission conflicts
+- **Concurrent Search Prevention**: Prevents multiple simultaneous USB searches that could cause conflicts
+
 ## Changelog
+
+### Version 0.0.5
+- **Enhanced USB Serial Number Support**: Added asynchronous serial number reading for CITIZEN USB printers
+- **Performance optimizations**: Smart filtering and sequential permission handling
+- **Technical improvements**: All code comments translated to English for consistency
+
+### Version 0.0.4
+- **Bug fix**: Fixed cast issue in `searchUsbPrinters()` method
 
 ### Version 0.0.3
 - **Multiple USB printers support**: Added ability to manage and print to multiple USB printers simultaneously

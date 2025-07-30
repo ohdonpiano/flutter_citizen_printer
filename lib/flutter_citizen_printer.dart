@@ -23,6 +23,7 @@ class UsbPrinterInfo {
   final String productName;
   final int vendorId;
   final int productId;
+  final String serialNumber;
 
   UsbPrinterInfo({
     required this.deviceId,
@@ -31,6 +32,7 @@ class UsbPrinterInfo {
     required this.productName,
     required this.vendorId,
     required this.productId,
+    required this.serialNumber,
   });
 
   factory UsbPrinterInfo.fromMap(Map<String, dynamic> map) {
@@ -41,6 +43,7 @@ class UsbPrinterInfo {
       productName: map['productName'] as String,
       vendorId: map['vendorId'] as int,
       productId: map['productId'] as int,
+      serialNumber: map['serialNumber'] as String? ?? '',
     );
   }
 
@@ -57,7 +60,7 @@ class UsbPrinterInfo {
 
   @override
   String toString() {
-    return 'UsbPrinterInfo(deviceId: $deviceId, deviceName: $deviceName, manufacturerName: $manufacturerName, productName: $productName, vendorId: $vendorId, productId: $productId)';
+    return 'UsbPrinterInfo(deviceId: $deviceId, deviceName: $deviceName, manufacturerName: $manufacturerName, productName: $productName, vendorId: $vendorId, productId: $productId, serialNumber: $serialNumber)';
   }
 }
 

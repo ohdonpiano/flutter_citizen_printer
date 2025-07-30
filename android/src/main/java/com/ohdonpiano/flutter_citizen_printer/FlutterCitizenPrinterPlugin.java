@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-// Classe per rappresentare informazioni su stampanti USB
+// Class to represent USB printer information
 class UsbPrinterInfo {
     public String deviceId;
     public String deviceName;
@@ -31,6 +31,7 @@ class UsbPrinterInfo {
     public String productName;
     public int vendorId;
     public int productId;
+    public String serialNumber;
     public UsbDevice usbDevice;
 
     public UsbPrinterInfo(UsbDevice device) {
@@ -41,6 +42,7 @@ class UsbPrinterInfo {
         this.productName = device.getProductName() != null ? device.getProductName() : "";
         this.vendorId = device.getVendorId();
         this.productId = device.getProductId();
+        this.serialNumber = ""; // Will be populated later with permission
     }
 
     public Map<String, Object> toMap() {
@@ -51,6 +53,7 @@ class UsbPrinterInfo {
         map.put("productName", productName);
         map.put("vendorId", vendorId);
         map.put("productId", productId);
+        map.put("serialNumber", serialNumber);
         return map;
     }
 
@@ -62,12 +65,14 @@ class UsbPrinterInfo {
                 ", productName='" + productName + '\'' +
                 ", vendorId=" + vendorId +
                 ", productId=" + productId +
+                ", serialNumber='" + serialNumber + '\'' +
                 '}';
     }
 }
 
 public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel.MethodCallHandler {
     private static final String ACTION_USB_PERMISSION = "com.citizen.USB_PERMISSION";
+    private static final String ACTION_USB_SERIAL_PERMISSION = "com.citizen.USB_SERIAL_PERMISSION";
     private MethodChannel channel;
     private Context context;
     private UsbManager usbManager;
@@ -75,7 +80,13 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     private BroadcastReceiver usbReceiver;
     private Map<String, PendingPrintRequest> pendingPrintRequests = new HashMap<>();
 
-    // Classe per gestire le richieste di stampa in attesa
+    // Variables for asynchronous USB search management with serial number
+    private MethodChannel.Result pendingSearchResult;
+    private ArrayList<UsbPrinterInfo> currentSearchPrinters;
+    private ArrayList<UsbDevice> citizenDevicesQueue;
+    private int currentDeviceIndex;
+
+    // Class to manage pending print requests
     private static class PendingPrintRequest {
         public UsbDevice device;
         public byte[] imageBytes;
@@ -95,7 +106,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         channel.setMethodCallHandler(this);
 
-        // Registro il BroadcastReceiver per le autorizzazioni USB
+        // Register the BroadcastReceiver for USB permissions
         usbReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -110,7 +121,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
 
                             if (pendingRequest != null) {
                                 if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                                    // L'autorizzazione è stata concessa
+                                    // Permission granted
                                     int res = executePrintWithDevice(pendingRequest.device, pendingRequest.imageBytes);
                                     if (res == LabelConst.CLS_SUCCESS) {
                                         pendingRequest.result.success(null);
@@ -118,9 +129,23 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
                                         pendingRequest.result.error("PRINT_ERROR", String.valueOf(res), null);
                                     }
                                 } else {
-                                    // L'autorizzazione è stata negata
+                                    // Permission denied
                                     pendingRequest.result.error("PERMISSION_DENIED", "USB permission denied", null);
                                 }
+                            }
+                        }
+                    }
+                } else if (ACTION_USB_SERIAL_PERMISSION.equals(action)) {
+                    synchronized (this) {
+                        UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+
+                        if (device != null) {
+                            if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                                // Permission granted, read the serial number
+                                processSerialNumberForDevice(device);
+                            } else {
+                                // Permission denied, continue with next device
+                                processNextCitizenDevice();
                             }
                         }
                     }
@@ -128,7 +153,8 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             }
         };
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-        // Per Android 13+ dobbiamo specificare il flag RECEIVER_NOT_EXPORTED
+        filter.addAction(ACTION_USB_SERIAL_PERMISSION);
+        // For Android 13+ we need to specify the RECEIVER_NOT_EXPORTED flag
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -205,12 +231,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             result.success(checkRes);
         } else if (call.method.equals("searchUsbPrinters")) {
             try {
-                ArrayList<Map<String, Object>> printers = searchUsbPrinters();
-                System.out.println("Found USB Printers: ");
-                for (Map<String, Object> printer : printers) {
-                    System.out.println("- " + printer);
-                }
-                result.success(printers);
+                searchUsbPrintersWithSerialNumbers(result);
             } catch (Exception e) {
                 result.error("USB_SEARCH_ERROR", e.getMessage(), null);
             }
@@ -290,7 +311,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         usbDeviceMap.clear();
 
         for (UsbDevice device : usbManager.getDeviceList().values()) {
-            // Usa getDeviceId() come chiave invece di getDeviceName()
+            // Use getDeviceId() as key instead of getDeviceName()
             String deviceKey = String.valueOf(device.getDeviceId());
             usbDeviceMap.put(deviceKey, device);
             UsbPrinterInfo printerInfo = new UsbPrinterInfo(device);
@@ -307,9 +328,9 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             return;
         }
 
-        // Verifica se abbiamo già il permesso
+        // Check if we already have permission
         if (usbManager.hasPermission(device)) {
-            // Abbiamo già il permesso, procedi direttamente con la stampa
+            // We already have permission, proceed directly with printing
             int res = executePrintWithDevice(device, imageBytes);
             if (res == LabelConst.CLS_SUCCESS) {
                 result.success(null);
@@ -319,7 +340,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             return;
         }
 
-        // Richiedi il permesso per il dispositivo USB
+        // Request permission for the USB device
         int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                 ? PendingIntent.FLAG_IMMUTABLE
                 : 0;
@@ -327,7 +348,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
                 context, 0, new Intent(ACTION_USB_PERMISSION), flags
         );
 
-        // Salva la richiesta di stampa in attesa usando deviceId come chiave
+        // Save the pending print request using deviceId as key
         pendingPrintRequests.put(deviceId, new PendingPrintRequest(device, imageBytes, result));
 
         usbManager.requestPermission(device, permissionIntent);
@@ -370,27 +391,156 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         return r;
     }
 
+    private void searchUsbPrintersWithSerialNumbers(MethodChannel.Result result) {
+        // If there's already a search in progress, return error
+        if (pendingSearchResult != null) {
+            result.error("SEARCH_IN_PROGRESS", "Another USB search is already in progress", null);
+            return;
+        }
+
+        // Initialize data structures for asynchronous search
+        pendingSearchResult = result;
+        currentSearchPrinters = new ArrayList<>();
+        citizenDevicesQueue = new ArrayList<>();
+        currentDeviceIndex = 0;
+        usbDeviceMap.clear();
+
+        // Collect all USB devices
+        for (UsbDevice device : usbManager.getDeviceList().values()) {
+            String deviceKey = String.valueOf(device.getDeviceId());
+            usbDeviceMap.put(deviceKey, device);
+            UsbPrinterInfo printerInfo = new UsbPrinterInfo(device);
+            currentSearchPrinters.add(printerInfo);
+
+            // Filter only CITIZEN devices for serial number reading
+            String manufacturerName = device.getManufacturerName();
+            if (manufacturerName != null && manufacturerName.toUpperCase().contains("CITIZEN")) {
+                citizenDevicesQueue.add(device);
+                System.out.println("Found CITIZEN device: " + printerInfo.toString());
+            } else {
+                System.out.println("Found non-CITIZEN device: " + printerInfo.toString());
+            }
+        }
+
+        System.out.println("Total USB devices found: " + currentSearchPrinters.size());
+        System.out.println("CITIZEN devices to process: " + citizenDevicesQueue.size());
+
+        // If there are no CITIZEN devices, return results immediately
+        if (citizenDevicesQueue.isEmpty()) {
+            finishSearchAndReturnResults();
+        } else {
+            // Start asynchronous process for CITIZEN devices
+            processNextCitizenDevice();
+        }
+    }
+
+    private void processNextCitizenDevice() {
+        if (currentDeviceIndex >= citizenDevicesQueue.size()) {
+            // All CITIZEN devices have been processed
+            finishSearchAndReturnResults();
+            return;
+        }
+
+        UsbDevice device = citizenDevicesQueue.get(currentDeviceIndex);
+
+        // Check if we already have permission for this device
+        if (usbManager.hasPermission(device)) {
+            // We already have permission, read serial number directly
+            processSerialNumberForDevice(device);
+        } else {
+            // Request permission to read serial number
+            requestSerialNumberPermission(device);
+        }
+    }
+
+    private void requestSerialNumberPermission(UsbDevice device) {
+        int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                ? PendingIntent.FLAG_IMMUTABLE
+                : 0;
+
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(
+                context, 0, new Intent(ACTION_USB_SERIAL_PERMISSION), flags
+        );
+
+        System.out.println("Requesting serial number permission for device: " + device.getDeviceId());
+        usbManager.requestPermission(device, permissionIntent);
+    }
+
+    private void processSerialNumberForDevice(UsbDevice device) {
+        try {
+            // Find the corresponding UsbPrinterInfo object and update the serial number
+            String deviceId = String.valueOf(device.getDeviceId());
+            for (UsbPrinterInfo printerInfo : currentSearchPrinters) {
+                if (printerInfo.deviceId.equals(deviceId)) {
+                    // Read the serial number with granted permission
+                    String serialNumber = device.getSerialNumber();
+                    printerInfo.serialNumber = serialNumber != null ? serialNumber : "";
+                    System.out.println("Serial number for device " + deviceId + ": " + printerInfo.serialNumber);
+                    break;
+                }
+            }
+        } catch (SecurityException e) {
+            System.err.println("Security exception reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
+        }
+
+        // Move to next device
+        currentDeviceIndex++;
+        processNextCitizenDevice();
+    }
+
+    private void finishSearchAndReturnResults() {
+        if (pendingSearchResult == null) {
+            return; // No search in progress
+        }
+
+        try {
+            // Convert results to Map for response
+            ArrayList<Map<String, Object>> resultList = new ArrayList<>();
+            for (UsbPrinterInfo printerInfo : currentSearchPrinters) {
+                resultList.add(printerInfo.toMap());
+            }
+
+            System.out.println("USB search completed. Found " + resultList.size() + " devices:");
+            for (Map<String, Object> printer : resultList) {
+                System.out.println("- " + printer);
+            }
+
+            // Send results
+            pendingSearchResult.success(resultList);
+        } catch (Exception e) {
+            pendingSearchResult.error("SEARCH_COMPLETION_ERROR", e.getMessage(), null);
+        } finally {
+            // Clean up state variables
+            pendingSearchResult = null;
+            currentSearchPrinters = null;
+            citizenDevicesQueue = null;
+            currentDeviceIndex = 0;
+        }
+    }
+
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
         channel.setMethodCallHandler(null);
 
-        // Deregistra il receiver solo se è stato registrato
+        // Unregister receiver only if it was registered
         if (usbReceiver != null) {
             try {
                 context.unregisterReceiver(usbReceiver);
             } catch (IllegalArgumentException e) {
-                // Il receiver potrebbe essere già stato deregistrato
+                // Receiver might already be unregistered
             }
             usbReceiver = null;
         }
 
-        // Pulisci le richieste pendenti e notifica gli errori
+        // Clean up pending requests and notify errors
         for (PendingPrintRequest request : pendingPrintRequests.values()) {
             request.result.error("PLUGIN_DETACHED", "Plugin was detached before print could complete", null);
         }
         pendingPrintRequests.clear();
 
-        // Pulisci le mappe
+        // Clean up maps
         usbDeviceMap.clear();
     }
 }
