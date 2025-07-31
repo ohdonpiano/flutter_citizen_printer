@@ -104,9 +104,11 @@ class FlutterCitizenPrinter {
     await _channel.invokeMethod('printImageUSB', {'imageBytes': imageBytes});
   }
 
-  static Future<List<UsbPrinterInfo>> searchUsbPrinters() async {
+  static Future<List<UsbPrinterInfo>> searchUsbPrinters({bool includeSerialNumbers = false}) async {
     final List<dynamic> devices =
-        await _channel.invokeMethod('searchUsbPrinters');
+        await _channel.invokeMethod('searchUsbPrinters', {
+      'includeSerialNumbers': includeSerialNumbers,
+    });
     return devices
         .map((e) => UsbPrinterInfo.fromMap(Map<String, dynamic>.from(e as Map)))
         .toList();

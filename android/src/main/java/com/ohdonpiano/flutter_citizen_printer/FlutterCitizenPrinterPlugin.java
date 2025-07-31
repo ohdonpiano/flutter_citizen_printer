@@ -86,6 +86,7 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     private ArrayList<UsbPrinterInfo> currentSearchPrinters;
     private ArrayList<UsbDevice> citizenDevicesQueue;
     private int currentDeviceIndex;
+    private boolean includeSerialNumbers;
 
     // Class to manage pending print requests
     private static class PendingPrintRequest {
@@ -232,7 +233,8 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             result.success(checkRes);
         } else if (call.method.equals("searchUsbPrinters")) {
             try {
-                searchUsbPrintersWithSerialNumbers(result);
+                Boolean includeSerial = call.argument("includeSerialNumbers");
+                searchUsbPrintersWithOptionalSerialNumbers(result, includeSerial != null ? includeSerial : false);
             } catch (Exception e) {
                 result.error("USB_SEARCH_ERROR", e.getMessage(), null);
             }
@@ -392,14 +394,23 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         return r;
     }
 
-    private void searchUsbPrintersWithSerialNumbers(MethodChannel.Result result) {
+    private void searchUsbPrintersWithOptionalSerialNumbers(MethodChannel.Result result, boolean includeSerialNumbers) {
         // If there's already a search in progress, return error
         if (pendingSearchResult != null) {
             result.error("SEARCH_IN_PROGRESS", "Another USB search is already in progress", null);
             return;
         }
 
-        // Initialize data structures for asynchronous search
+        this.includeSerialNumbers = includeSerialNumbers;
+
+        // If serial numbers are not requested, use simple synchronous search
+        if (!includeSerialNumbers) {
+            ArrayList<Map<String, Object>> printerList = searchUsbPrinters();
+            result.success(printerList);
+            return;
+        }
+
+        // Initialize data structures for asynchronous search with serial numbers
         pendingSearchResult = result;
         currentSearchPrinters = new ArrayList<>();
         citizenDevicesQueue = new ArrayList<>();
@@ -408,30 +419,33 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
 
         // Collect all USB devices
         Collection<UsbDevice> usbDeviceList = usbManager.getDeviceList().values();
-        System.out.println("Total USB devices found: " + usbDeviceList);
+        System.out.println("Total USB devices found: " + usbDeviceList.size());
+
         for (UsbDevice device : usbDeviceList) {
             String deviceKey = String.valueOf(device.getDeviceId());
             usbDeviceMap.put(deviceKey, device);
             UsbPrinterInfo printerInfo = new UsbPrinterInfo(device);
 
-            // Filter only CITIZEN devices for serial number reading
+            // Filter only CITIZEN devices for serial number reading optimization
             String manufacturerName = device.getManufacturerName();
             if (manufacturerName != null && manufacturerName.toUpperCase().contains("CITIZEN")) {
                 citizenDevicesQueue.add(device);
                 currentSearchPrinters.add(printerInfo);
                 System.out.println("Found CITIZEN device: " + printerInfo.toString());
             } else {
+                // Add non-CITIZEN devices to results without serial number
+                currentSearchPrinters.add(printerInfo);
                 System.out.println("Found non-CITIZEN device: " + printerInfo.toString());
             }
         }
 
-        System.out.println("CITIZEN devices to process: " + citizenDevicesQueue.size());
+        System.out.println("CITIZEN devices to process for serial numbers: " + citizenDevicesQueue.size());
 
         // If there are no CITIZEN devices, return results immediately
         if (citizenDevicesQueue.isEmpty()) {
             finishSearchAndReturnResults();
         } else {
-            // Start asynchronous process for CITIZEN devices
+            // Start asynchronous process for CITIZEN devices only
             processNextCitizenDevice();
         }
     }
@@ -445,6 +459,13 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
 
         UsbDevice device = citizenDevicesQueue.get(currentDeviceIndex);
 
+        // Only process if we need serial numbers
+        if (!includeSerialNumbers) {
+            currentDeviceIndex++;
+            processNextCitizenDevice();
+            return;
+        }
+
         // Check if we already have permission for this device
         if (usbManager.hasPermission(device)) {
             // We already have permission, read serial number directly
@@ -456,6 +477,13 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     }
 
     private void requestSerialNumberPermission(UsbDevice device) {
+        if (!includeSerialNumbers) {
+            // Skip permission request if serial numbers are not needed
+            currentDeviceIndex++;
+            processNextCitizenDevice();
+            return;
+        }
+
         int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                 ? PendingIntent.FLAG_IMMUTABLE
                 : 0;
@@ -469,22 +497,24 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     }
 
     private void processSerialNumberForDevice(UsbDevice device) {
-        try {
-            // Find the corresponding UsbPrinterInfo object and update the serial number
-            String deviceId = String.valueOf(device.getDeviceId());
-            for (UsbPrinterInfo printerInfo : currentSearchPrinters) {
-                if (printerInfo.deviceId.equals(deviceId)) {
-                    // Read the serial number with granted permission
-                    String serialNumber = device.getSerialNumber();
-                    printerInfo.serialNumber = serialNumber != null ? serialNumber : "";
-                    System.out.println("Serial number for device " + deviceId + ": " + printerInfo.serialNumber);
-                    break;
+        if (includeSerialNumbers) {
+            try {
+                // Find the corresponding UsbPrinterInfo object and update the serial number
+                String deviceId = String.valueOf(device.getDeviceId());
+                for (UsbPrinterInfo printerInfo : currentSearchPrinters) {
+                    if (printerInfo.deviceId.equals(deviceId)) {
+                        // Read the serial number with granted permission
+                        String serialNumber = device.getSerialNumber();
+                        printerInfo.serialNumber = serialNumber != null ? serialNumber : "";
+                        System.out.println("Serial number for device " + deviceId + ": " + printerInfo.serialNumber);
+                        break;
+                    }
                 }
+            } catch (SecurityException e) {
+                System.err.println("Security exception reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
+            } catch (Exception e) {
+                System.err.println("Error reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
             }
-        } catch (SecurityException e) {
-            System.err.println("Security exception reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Error reading serial number for device " + device.getDeviceId() + ": " + e.getMessage());
         }
 
         // Move to next device

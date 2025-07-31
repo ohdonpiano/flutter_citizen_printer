@@ -1,3 +1,19 @@
+## 0.0.6
+
+*   **BREAKING ENHANCEMENT**: Made serial number reading optional in `searchUsbPrinters()` method
+*   **New features**:
+    *   Added optional `includeSerialNumbers` parameter to `searchUsbPrinters()` (defaults to `false`)
+    *   Enhanced performance by avoiding permission requests when serial numbers are not needed
+    *   Maintained backward compatibility while providing opt-in serial number functionality
+*   **Performance improvements**:
+    *   Fast default behavior: USB search without serial numbers requires no permissions
+    *   Smart permission optimization: only requests USB permissions for CITIZEN devices when serial numbers are explicitly requested
+    *   Reduced user interruption by eliminating unnecessary permission dialogs
+*   **Technical enhancements**:
+    *   Improved asynchronous handling to support both fast and detailed USB searches
+    *   Enhanced code documentation and comments in English for international development
+    *   Better separation of concerns between basic device enumeration and detailed device information
+
 ## 0.0.5
 
 *   **Enhanced USB Serial Number Support**: Added asynchronous serial number reading for CITIZEN USB printers with optimized permission handling
