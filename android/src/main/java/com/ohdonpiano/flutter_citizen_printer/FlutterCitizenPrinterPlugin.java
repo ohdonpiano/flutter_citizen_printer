@@ -74,6 +74,7 @@ class UsbPrinterInfo {
 public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel.MethodCallHandler {
     private static final String ACTION_USB_PERMISSION = "com.citizen.USB_PERMISSION";
     private static final String ACTION_USB_SERIAL_PERMISSION = "com.citizen.USB_SERIAL_PERMISSION";
+    private static final long PERMISSION_TIMEOUT = 30000; // 30 secondi timeout
     private MethodChannel channel;
     private Context context;
     private UsbManager usbManager;
@@ -87,6 +88,9 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     private ArrayList<UsbDevice> citizenDevicesQueue;
     private int currentDeviceIndex;
     private boolean includeSerialNumbers;
+    private android.os.Handler searchTimeoutHandler;
+    private Runnable searchTimeoutRunnable;
+    private long searchStartTime;
 
     // Class to manage pending print requests
     private static class PendingPrintRequest {
@@ -236,8 +240,13 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
                 Boolean includeSerial = call.argument("includeSerialNumbers");
                 searchUsbPrintersWithOptionalSerialNumbers(result, includeSerial != null ? includeSerial : false);
             } catch (Exception e) {
+                // Clean up in case of error
+                cleanupSearchState();
                 result.error("USB_SEARCH_ERROR", e.getMessage(), null);
             }
+        } else if (call.method.equals("cancelUsbSearch")) {
+            // New method to force cancel any pending search
+            cancelPendingSearch(result);
         } else {
             result.notImplemented();
         }
@@ -494,6 +503,35 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
 
         System.out.println("Requesting serial number permission for device: " + device.getDeviceId());
         usbManager.requestPermission(device, permissionIntent);
+
+        // Start timeout handler
+        startPermissionTimeoutHandler(device);
+    }
+
+    private void startPermissionTimeoutHandler(UsbDevice device) {
+        // Cancel any existing timeout handler for the previous device
+        if (searchTimeoutHandler != null) {
+            searchTimeoutHandler.removeCallbacks(searchTimeoutRunnable);
+        }
+
+        // Start a new timeout handler
+        searchStartTime = System.currentTimeMillis();
+        searchTimeoutRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // Check if the permission was granted within the timeout period
+                if (System.currentTimeMillis() - searchStartTime >= PERMISSION_TIMEOUT) {
+                    // Timeout reached, proceed to next device
+                    System.out.println("Permission request timed out for device: " + device.getDeviceId());
+                    processNextCitizenDevice();
+                } else {
+                    // Reschedule the timeout check
+                    searchTimeoutHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+        searchTimeoutHandler = new android.os.Handler();
+        searchTimeoutHandler.postDelayed(searchTimeoutRunnable, 1000);
     }
 
     private void processSerialNumberForDevice(UsbDevice device) {
@@ -552,6 +590,27 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         }
     }
 
+    // New method to cancel any pending USB search
+    private void cancelPendingSearch(MethodChannel.Result result) {
+        if (pendingSearchResult == null) {
+            result.success("No search in progress");
+            return;
+        }
+
+        // Clean up state variables
+        cleanupSearchState();
+
+        result.success("Pending USB search canceled");
+    }
+
+    // Helper method to clean up search state variables
+    private void cleanupSearchState() {
+        pendingSearchResult = null;
+        currentSearchPrinters = null;
+        citizenDevicesQueue = null;
+        currentDeviceIndex = 0;
+    }
+
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
         channel.setMethodCallHandler(null);
@@ -571,8 +630,36 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             request.result.error("PLUGIN_DETACHED", "Plugin was detached before print could complete", null);
         }
         pendingPrintRequests.clear();
+        searchTimeoutRunnable = null;
+    }
+
+    // New method to start global timeout for entire search process
+    private void startGlobalSearchTimeout() {
+        cleanupTimeoutHandler(); // Clean up any existing timeout
+
+        searchTimeoutHandler = new android.os.Handler();
+        searchTimeoutRunnable = new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Global search timeout reached. Completing search with current results.");
+                finishSearchAndReturnResults();
+            }
+        };
+
+        // Set global timeout to 60 seconds (longer than individual permission timeout)
+        searchTimeoutHandler.postDelayed(searchTimeoutRunnable, 60000);
 
         // Clean up maps
         usbDeviceMap.clear();
     }
+
+    // Helper method to clean up timeout handlers
+    private void cleanupTimeoutHandler() {
+        if (searchTimeoutHandler != null && searchTimeoutRunnable != null) {
+            searchTimeoutHandler.removeCallbacks(searchTimeoutRunnable);
+            searchTimeoutHandler = null;
+            searchTimeoutRunnable = null;
+        }
+    }
 }
+
