@@ -74,6 +74,7 @@ class UsbPrinterInfo {
 public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel.MethodCallHandler {
     private static final String ACTION_USB_PERMISSION = "com.citizen.USB_PERMISSION";
     private static final String ACTION_USB_SERIAL_PERMISSION = "com.citizen.USB_SERIAL_PERMISSION";
+    private static final String ACTION_USB_PERMISSION_BULK = "com.citizen.USB_PERMISSION_BULK";
     private static final long PERMISSION_TIMEOUT = 10000; // Aumentato a 10 secondi
     private static final long GLOBAL_SEARCH_TIMEOUT = 60000; // 60 secondi per l'intera ricerca
     private MethodChannel channel;
@@ -130,13 +131,16 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
 
                             if (pendingRequest != null) {
                                 if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                                    // Permission granted
-                                    int res = executePrintWithDevice(pendingRequest.device, pendingRequest.imageBytes);
-                                    if (res == LabelConst.CLS_SUCCESS) {
-                                        pendingRequest.result.success(null);
-                                    } else {
-                                        pendingRequest.result.error("PRINT_ERROR", String.valueOf(res), null);
-                                    }
+                                    // Permission granted - wait a moment for USB to stabilize before printing
+                                    final PendingPrintRequest finalRequest = pendingRequest;
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                        int res = executePrintWithDevice(finalRequest.device, finalRequest.imageBytes);
+                                        if (res == LabelConst.CLS_SUCCESS) {
+                                            finalRequest.result.success(null);
+                                        } else {
+                                            finalRequest.result.error("PRINT_ERROR", String.valueOf(res), null);
+                                        }
+                                    }, 300); // 300ms delay for USB stabilization
                                 } else {
                                     // Permission denied
                                     pendingRequest.result.error("PERMISSION_DENIED", "USB permission denied", null);
@@ -165,11 +169,27 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
                             }
                         }
                     }
+                } else if (ACTION_USB_PERMISSION_BULK.equals(action)) {
+                    synchronized (this) {
+                        UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+
+                        if (device != null && pendingPermissionResult != null) {
+                            if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                                permissionsGrantedCount++;
+                                System.out.println("Bulk permission GRANTED for device: " + device.getDeviceId());
+                            } else {
+                                System.out.println("Bulk permission DENIED for device: " + device.getDeviceId());
+                            }
+                            // Request permission for the next device
+                            requestNextPermission();
+                        }
+                    }
                 }
             }
         };
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         filter.addAction(ACTION_USB_SERIAL_PERMISSION);
+        filter.addAction(ACTION_USB_PERMISSION_BULK);
         // For Android 13+ we need to specify the RECEIVER_NOT_EXPORTED flag
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -257,6 +277,12 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         } else if (call.method.equals("cancelUsbSearch")) {
             // New method to force cancel any pending search
             cancelPendingSearch(result);
+        } else if (call.method.equals("checkUsbPermissionsNeeded")) {
+            // Check if any Citizen USB device needs permission
+            result.success(checkUsbPermissionsNeeded());
+        } else if (call.method.equals("requestUsbPermissions")) {
+            // Request permissions for all Citizen USB devices that need it
+            requestAllUsbPermissions(result);
         } else {
             result.notImplemented();
         }
@@ -343,10 +369,26 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
     }
 
     private void printImageUsbSpecificWithPermission(String deviceId, byte[] imageBytes, MethodChannel.Result result) {
+        printImageUsbSpecificWithRetry(deviceId, imageBytes, result, 0);
+    }
+
+    private static final int MAX_PRINT_RETRIES = 3;
+    private static final long PRINT_RETRY_DELAY_MS = 500; // 500ms between retries
+
+    private void printImageUsbSpecificWithRetry(String deviceId, byte[] imageBytes, MethodChannel.Result result, int retryCount) {
         searchUsbPrinters();
         UsbDevice device = usbDeviceMap.get(deviceId);
+
         if (device == null) {
-            result.error("DEVICE_NOT_FOUND", "Device not found: " + deviceId, null);
+            if (retryCount < MAX_PRINT_RETRIES) {
+                // Device not found, wait and retry (USB enumeration may be in progress after permission grant)
+                System.out.println("Device " + deviceId + " not found, retrying... (attempt " + (retryCount + 1) + "/" + MAX_PRINT_RETRIES + ")");
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    printImageUsbSpecificWithRetry(deviceId, imageBytes, result, retryCount + 1);
+                }, PRINT_RETRY_DELAY_MS);
+                return;
+            }
+            result.error("DEVICE_NOT_FOUND", "Device not found: " + deviceId + " after " + MAX_PRINT_RETRIES + " retries", null);
             return;
         }
 
@@ -357,6 +399,14 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             if (res == LabelConst.CLS_SUCCESS) {
                 result.success(null);
             } else {
+                // If print failed and we have retries left, try again
+                if (retryCount < MAX_PRINT_RETRIES && res != LabelConst.CLS_SUCCESS) {
+                    System.out.println("Print failed with error " + res + ", retrying... (attempt " + (retryCount + 1) + "/" + MAX_PRINT_RETRIES + ")");
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        printImageUsbSpecificWithRetry(deviceId, imageBytes, result, retryCount + 1);
+                    }, PRINT_RETRY_DELAY_MS);
+                    return;
+                }
                 result.error("PRINT_ERROR", String.valueOf(res), null);
             }
             return;
@@ -705,6 +755,83 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             searchTimeoutHandler = null;
             globalTimeoutRunnable = null;
         }
+    }
+
+    // Check if any Citizen USB devices need permission
+    private boolean checkUsbPermissionsNeeded() {
+        Collection<UsbDevice> usbDeviceList = usbManager.getDeviceList().values();
+        for (UsbDevice device : usbDeviceList) {
+            String manufacturerName = device.getManufacturerName();
+            if (manufacturerName != null && manufacturerName.toUpperCase().contains("CITIZEN")) {
+                if (!usbManager.hasPermission(device)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Variables for permission request tracking
+    private MethodChannel.Result pendingPermissionResult;
+    private ArrayList<UsbDevice> devicesNeedingPermission;
+    private int permissionRequestCount;
+    private int permissionsGrantedCount;
+
+    // Request USB permissions for all Citizen devices that need it
+    private void requestAllUsbPermissions(MethodChannel.Result result) {
+        if (pendingPermissionResult != null) {
+            result.error("PERMISSION_IN_PROGRESS", "Permission request already in progress", null);
+            return;
+        }
+
+        devicesNeedingPermission = new ArrayList<>();
+        Collection<UsbDevice> usbDeviceList = usbManager.getDeviceList().values();
+
+        for (UsbDevice device : usbDeviceList) {
+            String manufacturerName = device.getManufacturerName();
+            if (manufacturerName != null && manufacturerName.toUpperCase().contains("CITIZEN")) {
+                if (!usbManager.hasPermission(device)) {
+                    devicesNeedingPermission.add(device);
+                }
+            }
+        }
+
+        if (devicesNeedingPermission.isEmpty()) {
+            result.success(0);
+            return;
+        }
+
+        pendingPermissionResult = result;
+        permissionRequestCount = devicesNeedingPermission.size();
+        permissionsGrantedCount = 0;
+
+        // Request permission for the first device - subsequent requests will be
+        // triggered in the broadcast receiver after each permission is handled
+        requestNextPermission();
+    }
+
+    private void requestNextPermission() {
+        if (devicesNeedingPermission == null || devicesNeedingPermission.isEmpty()) {
+            // All permissions processed
+            if (pendingPermissionResult != null) {
+                pendingPermissionResult.success(permissionsGrantedCount);
+                pendingPermissionResult = null;
+            }
+            return;
+        }
+
+        UsbDevice device = devicesNeedingPermission.remove(0);
+
+        int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                ? PendingIntent.FLAG_MUTABLE
+                : 0;
+
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(
+                context, device.getDeviceId(), new Intent(ACTION_USB_PERMISSION_BULK), flags
+        );
+
+        System.out.println("Requesting bulk permission for device: " + device.getDeviceId());
+        usbManager.requestPermission(device, permissionIntent);
     }
 }
 

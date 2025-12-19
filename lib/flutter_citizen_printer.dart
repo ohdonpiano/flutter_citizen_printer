@@ -66,7 +66,7 @@ class UsbPrinterInfo {
 
 class FlutterCitizenPrinter {
   static const MethodChannel _channel =
-      MethodChannel('flutter_citizen_printer');
+  MethodChannel('flutter_citizen_printer');
 
   /// Detects Citizen printers on the network.
   /// Returns a list of [CitizenPrinterDetails] containing the IP address and device name of each detected printer.
@@ -146,7 +146,7 @@ class FlutterCitizenPrinter {
   static Future<List<UsbPrinterInfo>> searchUsbPrinters(
       {bool includeSerialNumbers = false}) async {
     final List<dynamic> devices =
-        await _channel.invokeMethod('searchUsbPrinters', {
+    await _channel.invokeMethod('searchUsbPrinters', {
       'includeSerialNumbers': includeSerialNumbers,
     });
     return devices
@@ -166,5 +166,35 @@ class FlutterCitizenPrinter {
       'deviceId': deviceId,
       'imageBytes': imageBytes,
     });
+  }
+
+  /// Checks if USB permissions are needed for the connected printers.
+  /// This is useful to show a UI warning before triggering operations that
+  /// require USB permissions (like searching with serial numbers).
+  /// Returns true if there are USB devices that don't have permission yet.
+  ///
+  static Future<bool> checkUsbPermissionsNeeded() async {
+    try {
+      final result = await _channel.invokeMethod('checkUsbPermissionsNeeded');
+      return result as bool? ?? false;
+    } catch (e) {
+      // If the method is not implemented, assume permissions might be needed
+      return true;
+    }
+  }
+
+  /// Requests USB permissions for all connected Citizen printers.
+  /// This method will trigger the permission dialog for each printer that
+  /// doesn't have permission yet.
+  /// Returns the number of printers that needed permission requests.
+  /// Use this before printing to ensure all permissions are granted upfront.
+  ///
+  static Future<int> requestUsbPermissions() async {
+    try {
+      final result = await _channel.invokeMethod('requestUsbPermissions');
+      return result as int? ?? 0;
+    } catch (e) {
+      return 0;
+    }
   }
 }
