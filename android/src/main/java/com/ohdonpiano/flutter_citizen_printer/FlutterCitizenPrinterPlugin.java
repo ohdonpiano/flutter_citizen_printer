@@ -413,9 +413,11 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
         }
 
         // Request permission for the USB device
-        int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                ? PendingIntent.FLAG_IMMUTABLE
-                : 0;
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            // USB permission broadcasts need mutable intents so the system can attach EXTRA_DEVICE.
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
         PendingIntent permissionIntent = PendingIntent.getBroadcast(
                 context, 0, new Intent(ACTION_USB_PERMISSION), flags
         );
@@ -559,9 +561,11 @@ public class FlutterCitizenPrinterPlugin implements FlutterPlugin, MethodChannel
             return;
         }
 
-        int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                ? PendingIntent.FLAG_IMMUTABLE
-                : 0;
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            // USB permission broadcasts need mutable intents so the system can attach EXTRA_DEVICE.
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
 
         PendingIntent permissionIntent = PendingIntent.getBroadcast(
                 context, 0, new Intent(ACTION_USB_SERIAL_PERMISSION), flags
